@@ -125,8 +125,8 @@ def concat_data(url_lis):
 
 # 爬取结果保存到csv
 def save_df(df,city):
-    file_name = '{}招聘信息.csv'.format(city)
-    path = '成都.csv'.format(file_name)
+    file_name = '{}招聘信息'.format(city)
+    path = '../data/{}.csv'.format(file_name)
     df.to_csv(path,encoding = 'utf-8',index = False)
     print('{}保存成功'.format(file_name))
     return
