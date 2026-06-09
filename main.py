@@ -15,6 +15,8 @@ import time
 
 plt.rcParams['font.sans-serif'] = ['SimHei']
 plt.rcParams['axes.unicode_minus'] = False
+import matplotlib
+matplotlib.use('Agg')
 
 data = pd.read_csv('./data/job.csv')
 print(data.head())
@@ -142,115 +144,44 @@ plt.figure(figsize=(10, 6))  # 设置图表大小
 sns.barplot(x=average_salary_by_experience.values, y=average_salary_by_experience.index)
 plt.xlabel('平均薪资')
 plt.title('不同工作经验要求的平均薪资')
-plt.show()
+plt.tight_layout()
+plt.savefig('output/不同工作经验要求平均薪资.png', dpi=150)
+plt.close()
 
-# 选择用于模型的变量
-variables = ['工作经验', '学历要求', '公司类型', 'city']
-target = '平均薪资'
-
-data_model = data.copy()
-data_model = data_model[variables + [target]].dropna()
-data_model = data_model.replace([np.inf, -np.inf], np.nan).dropna()
-
-# 对分类变量进行one-hot编码
-data_encoded = pd.get_dummies(data_model[variables], drop_first=True)
-
-# 将数据分割为训练集和测试集
-X_train, X_test, y_train, y_test = train_test_split(
-    data_encoded, data_model[target], test_size=0.2, random_state=42
-)
-
-# 初始化并拟合模型
-model = LinearRegression()
-model.fit(X_train, y_train)
-
-# 进行预测并评估模型
-predictions = model.predict(X_test)
-rmse = np.sqrt(mean_squared_error(y_test, predictions))
-print(rmse)
-
-# 获取系数和截距
-coefficients = pd.Series(model.coef_, index=data_encoded.columns)
-intercept = model.intercept_
-
-# 可视化系数
-plt.figure(figsize=(15, 8))
-coefficients.sort_values().plot(kind='barh')
-plt.title('影响薪资的因素')
-plt.xlabel('系数值')
-plt.ylabel('因素')
-plt.grid(axis='x')
-plt.show()
-
-# 显示前5个正面和负面的系数
-coefficients.sort_values(ascending=False).head(5), coefficients.sort_values(ascending=True).head(5)
-
-# 使用多元线性回归模型对数据进行预测
-
-# 填充缺失的'平均薪资'值
-data['平均薪资'] = (data['最低薪资'] + data['最高薪资']) / 2
-
-# 先填充最低薪资和最高薪资中的NaN（用各自的中位数），再计算平均薪资
+# 填充 NaN + 对全量类别特征做独热编码
 data['最低薪资'] = data['最低薪资'].fillna(data['最低薪资'].median())
 data['最高薪资'] = data['最高薪资'].fillna(data['最高薪资'].median())
 data['平均薪资'] = (data['最低薪资'] + data['最高薪资']) / 2
-
-# 最终兜底：确保y中不再有NaN
 data['平均薪资'] = data['平均薪资'].fillna(data['平均薪资'].mean())
 
-# 检查X特征中是否还有NaN（独热编码后）
 categorical_cols = ['city', '工作经验', '学历要求', '公司类型', '公司规模', '职位名称', '公司名称']
 data_encoded = pd.get_dummies(data, columns=categorical_cols)
-# 定义特征和目标变量
 features_to_exclude = ['平均薪资', '薪资范围', '岗位标签', '最低薪资', '最高薪资', '地点'] + categorical_cols
 X = data_encoded.drop(columns=features_to_exclude, errors='ignore')
-# 兜底填充X中的NaN（防止其他数值列含NaN）
 X = X.fillna(X.mean())
-y = data['平均薪资']  # 直接从data取，确保已填充
+y = data['平均薪资']
+
+# 保存特征列名（用于后续预测时对齐）
+feature_columns = X.columns.tolist()
+
+# 划分数据集
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
 
 print(f"X contains NaN: {X.isna().any().any()}")
 print(f"y contains NaN: {y.isna().any()}")
-# 划分数据集
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
-# 初始化模型并拟合数据
-lr_model = LinearRegression()
-lr_model.fit(X_train, y_train)
-# 预测
-predictions = lr_model.predict(X_test)
-# 评估
-rmse = np.sqrt(mean_squared_error(y_test, predictions))
-print(f'Linear Regression RMSE: {rmse}')
-param_grid = {
-    'alpha': [0.01, 0.1, 1, 10, 100]  # 正则化参数
-}
-
-ridge_reg = Ridge()
-
-grid_search = GridSearchCV(ridge_reg, param_grid, cv=5, scoring='neg_mean_squared_error')
-grid_search.fit(X_train, y_train)
-
-best_ridge_reg = grid_search.best_estimator_
-# 使用最佳参数的模型进行预测
-ridge_predictions = best_ridge_reg.predict(X_test)
-
-# 评估模型性能
-ridge_rmse = np.sqrt(mean_squared_error(y_test, ridge_predictions))
-ridge_mae = mean_absolute_error(y_test, ridge_predictions)
-
-print(f"Tuned Ridge Regression RMSE: {ridge_rmse}")
-print(f"Tuned Ridge Regression MAE: {ridge_mae}")
 
 # ============================================================
-# 多模型对比：引入更多回归算法，选出最佳模型
+# 多模型对比：引入多种回归算法，选出最佳模型
 # ============================================================
 
-# 保存训练时的特征列名（用于后续预测时的对齐）
-feature_columns = X.columns.tolist()
+# Ridge 超参调优
+param_grid = {'alpha': [0.01, 0.1, 1, 10, 100]}
+ridge_best = GridSearchCV(Ridge(), param_grid, cv=5, scoring='neg_mean_squared_error')
+ridge_best.fit(X_train, y_train)
 
-# 定义要对比的模型
 models = {
     'Linear Regression': LinearRegression(),
-    'Ridge Regression': Ridge(alpha=grid_search.best_params_['alpha']),
+    'Ridge Regression': ridge_best.best_estimator_,
     'Random Forest': RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1),
     'Gradient Boosting': GradientBoostingRegressor(n_estimators=100, random_state=42),
     'SVR (RBF Kernel)': SVR(kernel='rbf'),
@@ -261,7 +192,7 @@ trained_models = {}
 scalers = {}
 
 print("\n" + "=" * 70)
-print("🚀 开始多模型训练与对比...")
+print("多模型训练与对比...")
 print("=" * 70)
 
 for name, model in models.items():
@@ -286,12 +217,12 @@ for name, model in models.items():
     mae = mean_absolute_error(y_test, preds)
     r2 = r2_score(y_test, preds)
     results.append({'模型': name, 'RMSE': rmse, 'MAE': mae, 'R²': r2, '耗时(秒)': round(elapsed, 2)})
-    print(f"  ✅ {name:30s}  RMSE={rmse:>10.2f}  MAE={mae:>10.2f}  R²={r2:.4f}  ({elapsed:.1f}s)")
+    print(f" >{name:30s}  RMSE={rmse:>10.2f}  MAE={mae:>10.2f}  R²={r2:.4f}  ({elapsed:.1f}s)")
 
 results_df = pd.DataFrame(results).sort_values('RMSE').reset_index(drop=True)
 
 print("\n" + "=" * 70)
-print("📊 各模型表现对比（按 RMSE 升序排列 ↓）")
+print("各模型表现对比（按 RMSE 升序排列）")
 print("=" * 70)
 print(results_df.to_string(index=False))
 
@@ -301,7 +232,7 @@ best_model = trained_models[best_model_name]
 best_scaler = scalers[best_model_name]
 
 print(f"\n{'=' * 70}")
-print(f"🏆 最佳模型: {best_model_name}")
+print(f"最佳模型: {best_model_name}")
 print(f"   RMSE: {results_df.loc[0, 'RMSE']:,.2f}")
 print(f"   MAE:  {results_df.loc[0, 'MAE']:,.2f}")
 print(f"   R²:   {results_df.loc[0, 'R²']:.4f}")
@@ -337,8 +268,6 @@ def predict_salary(education, experience, desired_city, desired_company_type,
 
     # 与训练时相同的独热编码
     user_encoded = pd.get_dummies(user_data, columns=categorical_cols)
-
-    # 对齐列：确保与训练时的特征列完全一致（缺失列补0，多余列丢弃）
     user_encoded = user_encoded.reindex(columns=feature_columns, fill_value=0)
 
     # 如果是 SVR 需要用相同的 scaler 做缩放
@@ -351,16 +280,14 @@ def predict_salary(education, experience, desired_city, desired_company_type,
     return round(prediction)
 
 
-# ============================================================
 # 交互式薪资预测
-# ============================================================
 print(f"\n{'=' * 50}")
-print("💼 薪资预测工具（基于最佳模型）")
+print("薪资预测工具（基于最佳模型）")
 print("=" * 50)
 education = input("请输入您的学历（例如：本科）: ")
 experience = input("请输入您的工作经验（例如：1-3年）: ")
 desired_city = input("请输入您希望工作的城市（例如：上海）: ")
-desired_company_type = input("请输入您希望的公司类型（例如：外商独资）: ")
+desired_company_type = input("请输入您希望的公司类型（例如：国企）: ")
 desired_position = input("请输入您希望的职位名称（例如：数据分析师）: ")
 
 predicted_salary = predict_salary(
@@ -368,6 +295,6 @@ predicted_salary = predict_salary(
 )
 
 print(f"\n{'=' * 50}")
-print(f"📊 基于您提供的信息，预计平均薪资为: {predicted_salary:,.0f} 元/月")
+print(f"基于您提供的信息，预计平均薪资为: {predicted_salary:,.0f} 元/月")
 print(f"   （使用模型: {best_model_name}）")
 print(f"{'=' * 50}")
