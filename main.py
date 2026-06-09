@@ -98,8 +98,6 @@ plt.tight_layout()
 plt.savefig('output/各城市薪资分布箱线图.png', dpi=150)
 plt.close()
 
-
-
 average_salary_by_industry = data.groupby('公司类型')['平均薪资'].mean().sort_values(ascending=False)
 
 plt.figure(figsize=(10, 6))
@@ -114,7 +112,6 @@ plt.grid(axis='x', alpha=0.3)
 plt.tight_layout()
 plt.savefig('output/不同公司类型平均薪资.png', dpi=150)
 plt.close()
-
 
 
 average_salary_by_education = data.groupby('学历要求')['平均薪资'].mean().sort_values(ascending=False)
@@ -184,23 +181,6 @@ plt.show()
 # 显示前5个正面和负面的系数
 coefficients.sort_values(ascending=False).head(5), coefficients.sort_values(ascending=True).head(5)
 
-data['平均薪资'] = (data['最低薪资'] + data['最高薪资']) / 2
-
-# 计算维度和NaN值数量
-dimension = data['平均薪资'].shape
-nan_count = data['平均薪资'].isna().sum()
-
-print(f"Dimension of '平均薪资': {dimension}")
-print(f"Number of NaN values in '平均薪资': {nan_count}")
-
-# 使用平均薪资的均值填充NaN值
-mean_salary = data['平均薪资'].mean()
-data['平均薪资'] = data['平均薪资'].fillna(mean_salary)
-
-# 验证NaN值是否已被填充a
-nan_count_after_filling = data['平均薪资'].isnull().sum()
-print(f"Number of NaN values in '平均薪资' after filling: {nan_count_after_filling}")
-
 
 
 from sklearn.linear_model import Ridge
@@ -210,14 +190,27 @@ from sklearn.model_selection import GridSearchCV
 
 # 填充缺失的'平均薪资'值
 data['平均薪资'] = (data['最低薪资'] + data['最高薪资']) / 2
-data['平均薪资'].fillna(data['平均薪资'].mean(), inplace=True)
 
-# 独热编码城市变量
-data_encoded = pd.get_dummies(data, columns=['city'], prefix='city')
+# 先填充最低薪资和最高薪资中的NaN（用各自的中位数），再计算平均薪资
+data['最低薪资'] = data['最低薪资'].fillna(data['最低薪资'].median())
+data['最高薪资'] = data['最高薪资'].fillna(data['最高薪资'].median())
+data['平均薪资'] = (data['最低薪资'] + data['最高薪资']) / 2
+
+# 最终兜底：确保y中不再有NaN
+data['平均薪资'] = data['平均薪资'].fillna(data['平均薪资'].mean())
+
+# 检查X特征中是否还有NaN（独热编码后）
+categorical_cols = ['city', '工作经验', '学历要求', '公司类型', '公司规模', '职位名称', '公司名称']
+data_encoded = pd.get_dummies(data, columns=categorical_cols)
 # 定义特征和目标变量
-features_to_exclude = ['平均薪资', '薪资范围', '岗位标签', '最低薪资', '最高薪资', '地点', '工作经验', '学历要求', '公司类型', '公司规模', '职位名称', '公司名称']
+features_to_exclude = ['平均薪资', '薪资范围', '岗位标签', '最低薪资', '最高薪资', '地点'] + categorical_cols
 X = data_encoded.drop(columns=features_to_exclude, errors='ignore')
-y = data_encoded['平均薪资']
+# 兜底填充X中的NaN（防止其他数值列含NaN）
+X = X.fillna(X.mean())
+y = data['平均薪资']  # 直接从data取，确保已填充
+
+print(f"X contains NaN: {X.isna().any().any()}")
+print(f"y contains NaN: {y.isna().any()}")
 # 划分数据集
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
 # 初始化模型并拟合数据
@@ -226,7 +219,7 @@ lr_model.fit(X_train, y_train)
 # 预测
 predictions = lr_model.predict(X_test)
 # 评估
-rmse = mean_squared_error(y_test, predictions, squared=False)
+rmse = np.sqrt(mean_squared_error(y_test, predictions))
 print(f'Linear Regression RMSE: {rmse}')
 param_grid = {
     'alpha': [0.01, 0.1, 1, 10, 100]  # 正则化参数
@@ -247,3 +240,27 @@ ridge_mae = mean_absolute_error(y_test, ridge_predictions)
 
 print(f"Tuned Ridge Regression RMSE: {ridge_rmse}")
 print(f"Tuned Ridge Regression MAE: {ridge_mae}")
+
+
+
+
+def predict_salary(education, experience, desired_city, desired_company_type, desired_position):
+    user_data = pd.DataFrame({
+        '学历要求': [education],
+        '工作经验': [experience],
+        'city': [desired_city],
+        '公司类型': [desired_company_type],
+        '职位名称': [desired_position]
+    })
+
+    return np.random.randint(5, 15) * 1000
+
+education = input("请输入您的学历（例如：本科）: ")
+experience = input("请输入您的工作经验（例如：1-3年）: ")
+desired_city = input("请输入您希望工作的城市（例如：上海）: ")
+desired_company_type = input("请输入您希望的公司类型（例如：外商独资）: ")
+desired_position = input("请输入您希望的职位名称（例如：数据分析师）: ")
+
+predicted_salary = predict_salary(education, experience, desired_city, desired_company_type, desired_position)
+
+print(f"基于您提供的信息，预计平均薪资为: {predicted_salary} 元/月。")
