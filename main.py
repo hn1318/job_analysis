@@ -170,9 +170,7 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
 print(f"X contains NaN: {X.isna().any().any()}")
 print(f"y contains NaN: {y.isna().any()}")
 
-# ============================================================
 # 多模型对比：引入多种回归算法，选出最佳模型
-# ============================================================
 
 # Ridge 超参调优
 param_grid = {'alpha': [0.01, 0.1, 1, 10, 100]}
@@ -192,8 +190,7 @@ trained_models = {}
 scalers = {}
 
 print("\n" + "=" * 70)
-print("多模型训练与对比...")
-print("=" * 70)
+print("多模型训练与对比：")
 
 for name, model in models.items():
     start = time.time()
@@ -223,7 +220,6 @@ results_df = pd.DataFrame(results).sort_values('RMSE').reset_index(drop=True)
 
 print("\n" + "=" * 70)
 print("各模型表现对比（按 RMSE 升序排列）")
-print("=" * 70)
 print(results_df.to_string(index=False))
 
 # 取 RMSE 最低的模型作为最佳模型
@@ -238,10 +234,6 @@ print(f"   MAE:  {results_df.loc[0, 'MAE']:,.2f}")
 print(f"   R²:   {results_df.loc[0, 'R²']:.4f}")
 print(f"{'=' * 70}")
 
-
-# ============================================================
-# 真正的薪资预测函数（使用最佳模型）
-# ============================================================
 def predict_salary(education, experience, desired_city, desired_company_type,
                    desired_position, company_scale=None, company_name=None):
     """
