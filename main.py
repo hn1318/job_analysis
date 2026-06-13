@@ -91,18 +91,15 @@ plt.tight_layout()
 plt.savefig('output/按城市平均薪资分布.png', dpi=150)
 plt.close()
 
-city_order = data.groupby('city')['平均薪资'].median().sort_values(ascending=False).index
-plt.figure(figsize=(12, 6))
-sns.boxplot(x='city', y='平均薪资', data=data, order=city_order, hue='city', palette="viridis", legend=False)
-plt.yscale('log')
-plt.xticks(rotation=45)
-plt.xlabel('城市', fontsize=12)
-plt.ylabel('平均薪资', fontsize=12)
-plt.title('各城市薪资分布箱线图（对数尺度）', fontsize=14, fontweight='bold')
-plt.grid(axis='y', alpha=0.3)
-plt.tight_layout()
-plt.savefig('output/各城市薪资分布箱线图.png', dpi=150)
-plt.close()
+# 生成词云图 - 基于岗位标签
+all_tags = data['岗位标签'].str.split(',').explode().str.strip().str.replace(r'[\[\]]', '', regex=True).value_counts()
+all_tags = all_tags[all_tags.index != '']
+
+wc = WordCloud()
+wc.add("", list(all_tags.items()), word_size_range=[20, 100])
+wc.set_global_opts(title_opts=opts.TitleOpts(title="岗位标签词云图"))
+wc.render('output/岗位标签词云图.html')
+print("词云图已保存: output/岗位标签词云图.html")
 
 average_salary_by_industry = data.groupby('公司类型')['平均薪资'].mean().sort_values(ascending=False)
 
@@ -148,6 +145,41 @@ plt.tight_layout()
 plt.savefig('output/不同工作经验要求平均薪资.png', dpi=150)
 plt.close()
 
+# ========== 热力图分析 ==========
+data['simple_city'] = data['city'].apply(lambda x: x.split('-')[0])
+
+# 1. 公司类型与平均薪资相关系数热力图
+company_type_dummies = pd.get_dummies(data['公司类型'], prefix='公司类型')
+company_dummies_with_salary = company_type_dummies.copy()
+company_dummies_with_salary['平均薪资'] = data['平均薪资'].values
+corr_company = company_dummies_with_salary.corr()
+
+n_company = len(corr_company.columns)
+plt.figure(figsize=(max(6, n_company * 0.8), max(5, n_company * 0.8)))
+sns.heatmap(corr_company, cmap='coolwarm', annot=True, fmt='.2f',
+            square=True, cbar=True, linewidths=0.5)
+plt.title('公司类型与平均薪资相关系数', fontsize=14, fontweight='bold')
+plt.tight_layout()
+plt.savefig('output/公司类型与薪资相关系数热力图.png', dpi=150)
+plt.close()
+
+# 2. 城市(simple_city)与平均薪资相关系数热力图
+city_dummies = pd.get_dummies(data['simple_city'], prefix='城市')
+city_dummies_with_salary = city_dummies.copy()
+city_dummies_with_salary['平均薪资'] = data['平均薪资'].values
+corr_city = city_dummies_with_salary.corr()
+
+n_city = len(corr_city.columns)
+plt.figure(figsize=(max(6, n_city * 0.7), max(5, n_city * 0.7)))
+sns.heatmap(corr_city, cmap='coolwarm', annot=True, fmt='.2f',
+            square=True, cbar=True, linewidths=0.5)
+plt.title('城市(simple_city)与平均薪资相关系数', fontsize=14, fontweight='bold')
+plt.tight_layout()
+plt.savefig('output/城市与薪资相关系数热力图.png', dpi=150)
+plt.close()
+
+print("热力图已保存至 output 目录")
+
 # 填充 NaN + 对全量类别特征做独热编码
 data['最低薪资'] = data['最低薪资'].fillna(data['最低薪资'].median())
 data['最高薪资'] = data['最高薪资'].fillna(data['最高薪资'].median())
@@ -156,7 +188,7 @@ data['平均薪资'] = data['平均薪资'].fillna(data['平均薪资'].mean())
 
 categorical_cols = ['city', '工作经验', '学历要求', '公司类型', '公司规模', '职位名称', '公司名称']
 data_encoded = pd.get_dummies(data, columns=categorical_cols)
-features_to_exclude = ['平均薪资', '薪资范围', '岗位标签', '最低薪资', '最高薪资', '地点'] + categorical_cols
+features_to_exclude = ['平均薪资', '薪资范围', '岗位标签', '最低薪资', '最高薪资', '地点', 'simple_city'] + categorical_cols
 X = data_encoded.drop(columns=features_to_exclude, errors='ignore')
 X = X.fillna(X.mean())
 y = data['平均薪资']
