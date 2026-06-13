@@ -79,7 +79,7 @@ os.makedirs('output', exist_ok=True)
 
 plt.figure(figsize=(10, 6))
 ax = sns.barplot(x=average_salary_by_city.values, y=average_salary_by_city.index,
-                 hue=average_salary_by_city.index, palette="viridis", legend=False)
+                 hue=average_salary_by_city.index, palette="Blues_d", legend=False)
 # 添加数值标签
 for i, v in enumerate(average_salary_by_city.values):
     ax.text(v + 50, i, f'{v:,.0f}', va='center', fontsize=9)
@@ -92,7 +92,7 @@ plt.savefig('output/按城市平均薪资分布.png', dpi=150)
 plt.close()
 
 # 生成词云图 - 基于岗位标签
-all_tags = data['岗位标签'].str.split(',').explode().str.strip().str.replace(r'[\[\]]', '', regex=True).value_counts()
+all_tags = data['岗位标签'].str.split(',').explode().str.strip().str.replace(r"[\[\]']", '', regex=True).value_counts()
 all_tags = all_tags[all_tags.index != '']
 
 wc = WordCloud()
@@ -105,7 +105,7 @@ average_salary_by_industry = data.groupby('公司类型')['平均薪资'].mean()
 
 plt.figure(figsize=(10, 6))
 ax = sns.barplot(x=average_salary_by_industry.values, y=average_salary_by_industry.index,
-                 hue=average_salary_by_industry.index, palette="viridis", legend=False)
+                 hue=average_salary_by_industry.index, palette="Blues_d", legend=False)
 for i, v in enumerate(average_salary_by_industry.values):
     ax.text(v + 50, i, f'{v:,.0f}', va='center', fontsize=9)
 plt.xlabel('平均薪资', fontsize=12)
@@ -123,7 +123,7 @@ average_salary_by_education = data.groupby('学历要求')['平均薪资'].mean(
 education_order = average_salary_by_education.index.tolist()
 plt.figure(figsize=(10, 6))
 ax = sns.barplot(x=average_salary_by_education.values, y=average_salary_by_education.index,
-                 hue=average_salary_by_education.index, order=education_order, palette="viridis", legend=False)
+                 hue=average_salary_by_education.index, order=education_order, palette="Blues_d", legend=False)
 for i, v in enumerate(average_salary_by_education.values):
     ax.text(v + 50, i, f'{v:,.0f}', va='center', fontsize=9)
 plt.xlabel('平均薪资', fontsize=12)
@@ -138,7 +138,8 @@ plt.close()
 average_salary_by_experience = data.groupby('工作经验')['平均薪资'].mean().sort_values(ascending=False)
 # 使用 seaborn 创建条形图
 plt.figure(figsize=(10, 6))  # 设置图表大小
-sns.barplot(x=average_salary_by_experience.values, y=average_salary_by_experience.index)
+sns.barplot(x=average_salary_by_experience.values, y=average_salary_by_experience.index,
+            hue=average_salary_by_experience.index, palette="Blues_d", legend=False)
 plt.xlabel('平均薪资')
 plt.title('不同工作经验要求的平均薪资')
 plt.tight_layout()
@@ -177,8 +178,6 @@ plt.title('城市(simple_city)与平均薪资相关系数', fontsize=14, fontwei
 plt.tight_layout()
 plt.savefig('output/城市与薪资相关系数热力图.png', dpi=150)
 plt.close()
-
-print("热力图已保存至 output 目录")
 
 # 填充 NaN + 对全量类别特征做独热编码
 data['最低薪资'] = data['最低薪资'].fillna(data['最低薪资'].median())
